@@ -1,0 +1,8 @@
+/* Font Inter variable */
+@import "@fontsource-variable/inter";
+
+/* Tailwind layers */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+

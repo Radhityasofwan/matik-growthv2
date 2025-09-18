@@ -1,0 +1,36 @@
+/* resources/css/app.css — FINAL */
+
+/* Font Inter variable */
+@import "@fontsource-variable/inter";
+
+/* Tailwind layers */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===== Sidebar behavior & item style ===== */
+@layer components {
+  /* State default: sidebar collapsed (desktop) / normal (mobile) */
+  .sidebar-shell .menu :where(li > a) {
+    @apply flex items-center h-11 rounded-xl transition-all duration-200 ease-out;
+    @apply px-3 justify-center gap-0;
+  }
+  .sidebar-shell .menu svg {
+    @apply h-5 w-5;
+  }
+
+  /* Desktop: saat sidebar di-hover → expand (pakai selector CSS, bukan variant di @apply) */
+  @screen lg {
+    .group\/sidebar:hover .menu :where(li > a),
+    .group\/sidebar:focus-within .menu :where(li > a) {
+      @apply px-4 justify-start gap-3;
+    }
+  }
+}
+
+/* Lebar sidebar (desktop): collapsed = 5rem, expanded = 16rem */
+@media (min-width: 1024px) {
+  #app-sidebar { width: 5rem; }
+  #app-sidebar:hover,
+  #app-sidebar:focus-within { width: 16rem; }
+}

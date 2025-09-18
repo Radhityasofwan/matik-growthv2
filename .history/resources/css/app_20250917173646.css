@@ -1,0 +1,7 @@
+/* Mengimpor font Inter */
+@import "@fontsource-variable/inter";
+
+/* Mengimpor lapisan dasar Tailwind */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

@@ -1,0 +1,37 @@
+/* Mengimpor font Inter */
+@import "@fontsource-variable/inter";
+
+/* Mengimpor lapisan dasar Tailwind */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* FIXED: Mendefinisikan tema kustom 'softblue' di dalam layer CSS.
+  Cara ini memastikan tema kustom Anda dapat digunakan bersamaan
+  dengan semua tema built-in DaisyUI tanpa konflik.
+*/
+@layer base {
+  [data-theme="softblue"] {
+    --p: 198 96% 51%;   /* primary:   #3B82F6 */
+    --pc: 0 0% 100%;    /* primary-content */
+
+    --s: 220 100% 96%;  /* secondary: #ECF4FF */
+    --sc: 221 39% 11%;   /* secondary-content */
+
+    --a: 174 100% 36%;  /* accent:    #1FB2A6 */
+    --ac: 0 0% 100%;    /* accent-content */
+
+    --n: 221 39% 11%;   /* neutral:   #1E293B */
+    --nc: 220 14% 96%;   /* neutral-content */
+
+    --b1: 0 0% 100%;    /* base-100:  #ffffff */
+    --b2: 220 14% 96%;  /* base-200:  #F8FAFC */
+    --b3: 220 13% 91%;  /* base-300:  #E2E8F0 */
+    --bc: 221 39% 11%;  /* base-content */
+
+    --in: 207 90% 54%;  /* info */
+    --su: 158 64% 52%;  /* success */
+    --wa: 39 92% 56%;   /* warning */
+    --er: 0 84% 60%;    /* error */
+  }
+}

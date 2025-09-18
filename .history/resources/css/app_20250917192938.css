@@ -1,0 +1,28 @@
+/* resources/css/app.css — FINAL FIX */
+
+/* Font Inter variable */
+@import "@fontsource-variable/inter";
+
+/* Tailwind layers */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===== Sidebar behavior & item style ===== */
+@layer components {
+  /* Item menu: ukuran/padding sinkron saat collapsed→expanded */
+  .sidebar-shell .menu :where(li>a){
+    @apply flex items-center h-11 rounded-xl transition-all duration-200 ease-out;
+    @apply px-3 lg:group-hover/sidebar:px-4;                 /* padding */
+    @apply justify-center lg:group-hover/sidebar:justify-start; /* posisi */
+    @apply gap-0 lg:group-hover/sidebar:gap-3;               /* jarak icon-teks */
+  }
+  .sidebar-shell .menu svg { @apply h-5 w-5; }               /* ukuran ikon konsisten */
+}
+
+/* Lebar sidebar (desktop): collapsed = 5rem, expanded = 16rem */
+@media (min-width: 1024px) {
+  #app-sidebar { width: 5rem; }
+  #app-sidebar:hover,
+  #app-sidebar:focus-within { width: 16rem; }
+}

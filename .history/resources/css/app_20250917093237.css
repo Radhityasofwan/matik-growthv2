@@ -1,0 +1,11 @@
+/* resources/css/app.css — FINAL */
+@import "@fontsource-variable/inter";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Util opsional untuk scroll horizontal tabel & snap */
+@layer utilities {
+  .h-scroll-snap { scroll-snap-type: x proximity; }
+  .h-snap { scroll-snap-align: start; }
+}

@@ -1,0 +1,143 @@
+@extends('layouts.app')
+
+@section('title', 'Tasks - Matik Growth Hub')
+
+@section('content')
+<style>
+    .kanban-column {
+        min-height: 70vh;
+    }
+    .flash-ring {
+        box-shadow: 0 0 0 3px oklch(var(--su)/.55);
+        transition: box-shadow .8s ease;
+    }
+</style>
+
+@php
+  // Kolom
+  $statusConfig = [
+      'open' => ['title' => 'Not Started', 'color' => 'base-content', 'tone' => 'neutral'],
+      'in_progress' => ['title' => 'Doing', 'color' => 'info', 'tone' => 'info'],
+      'review' => ['title' => 'Paused', 'color' => 'warning', 'tone' => 'warning'],
+      'done' => ['title' => 'Done', 'color' => 'success', 'tone' => 'success'],
+  ];
+
+  // Badge prioritas
+  function prioBadge($p){
+      return match($p){ 
+          'low'=>'badge-info', 
+          'medium'=>'badge-success',
+          'high'=>'badge-warning',
+          'urgent'=>'badge-error', 
+          default=>'badge-ghost' 
+      };
+  }
+@endphp
+
+<div class="container mx-auto px-4 lg:px-6 py-8">
+
+  {{-- Header & CTA --}}
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div class="space-y-1">
+      <h1 class="text-3xl font-bold text-base-content">Papan Tugas</h1>
+      <p class="text-base-content/70">Kelola alur kerja tim Anda secara visual.</p>
+    </div>
+    <button type="button" class="btn btn-primary" onclick="document.getElementById('create_task_modal').showModal()">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+      Buat Tugas Baru
+    </button>
+  </div>
+
+  {{-- Board --}}
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    @foreach ($statusConfig as $status => $config)
+      <section>
+        <header class="flex items-center gap-2 mb-4">
+          <span class="w-2.5 h-2.5 rounded-full bg-{{ $config['color'] }}"></span>
+          <h2 class="font-semibold text-{{ $config['color'] }}">{{ $config['title'] }}</h2>
+          <span class="badge badge-ghost badge-sm">{{ $tasks[$status]->count() }}</span>
+        </header>
+        <div 
+            id="{{ $status }}" 
+            class="kanban-column bg-base-200/50 rounded-lg p-2 space-y-3" 
+            data-status="{{ $status }}"
+        >
+          @foreach ($tasks[$status] as $task)
+            <article 
+                id="task-{{ $task->id }}"
+                class="card bg-base-100 shadow-sm cursor-grab active:cursor-grabbing border border-base-300/80"
+                @if($task->is_pinned) style="order: -1;" @endif
+            >
+                <div class="card-body p-3">
+                    @if($task->progress > 0)
+                    <progress class="progress progress-primary w-full h-1 absolute top-0 left-0" value="{{ $task->progress }}" max="100"></progress>
+                    @endif
+
+                    <div class="flex justify-between items-start gap-2">
+                        <div class="flex items-center gap-2">
+                            @if($task->icon)
+                                <span class="text-lg">{{ $task->icon }}</span>
+                            @endif
+                            <p class="font-medium text-base-content leading-tight">{{ $task->title }}</p>
+                        </div>
+                        <div class="dropdown dropdown-end">
+                            <label tabindex="0" class="btn btn-ghost btn-xs btn-circle">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 10a2 2 0 100 4 2 2 0 000-4z" /></svg>
+                            </label>
+                            <ul tabindex="0" class="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52 z-20 border border-base-300/50">
+                                <li><a onclick="togglePin({{ $task->id }})"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg> {{$task->is_pinned ? 'Unpin Task' : 'Pin Task'}}</a></li>
+                                <div class="divider my-1"></div>
+                                <li><a onclick="openEditModal({{ $task->id }})"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg> Edit Property</a></li>
+                                <div class="divider my-1"></div>
+                                <li><a onclick="copyLink({{ $task->id }})"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg> Copy Link</a></li>
+                                <li><a onclick="duplicateTask({{ $task->id }})"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg> Duplicate</a></li>
+                                <div class="divider my-1"></div>
+                                <li><a onclick="deleteTask({{ $task->id }})" class="text-error"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg> Delete</a></li>
+                                <div class="divider my-1"></div>
+                                <li><a><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg> Comment</a></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2 mt-3">
+                        <span class="badge {{ prioBadge($task->priority) }} badge-sm">{{ ucfirst($task->priority) }}</span>
+                    </div>
+
+                    <div class="flex items-center justify-between mt-4">
+                        <div class="flex items-center gap-2 text-xs text-base-content/60">
+                            @if($task->due_date)
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                            <span @if($task->due_date->isPast() && $task->status !=='done') class="text-error font-semibold" @endif>
+                                {{ $task->due_date->format('d M') }}
+                            </span>
+                            @endif
+                        </div>
+                        @if($task->assignee)
+                            <div class="tooltip" data-tip="{{ $task->assignee->name }}">
+                                <div class="avatar w-8 h-8">
+                                    <div class="rounded-full ring ring-base-300 ring-offset-base-100 ring-offset-1">
+                                    @if ($task->assignee->avatar)
+                                        <img src="{{ asset('storage/' . $task->assignee->avatar) }}" alt="Avatar" />
+                                    @else
+                                        <img src="https://ui-avatars.com/api/?name={{ urlencode($task->assignee->name) }}&background=random&color=fff" alt="Avatar" />
+                                    @endif
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </article>
+          @endforeach
+        </div>
+      </section>
+    @endforeach
+  </div>
+</div>
+
+{{-- Toast Container --}}
+<div id="toast-container" class="toast toast-bottom toast-end z-50"></div>
+
+@include('content.tasks.partials.modals')
+@endsection
+

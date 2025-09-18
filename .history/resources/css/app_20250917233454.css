@@ -1,0 +1,9 @@
+/* resources/css/app.css — FINAL (tambahan aturan mobile-open) */
+
+/* Font Inter variable */
+@import "@fontsource-variable/inter";
+
+/* Tailwind layers */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

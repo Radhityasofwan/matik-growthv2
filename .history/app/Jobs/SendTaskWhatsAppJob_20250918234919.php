@@ -1,0 +1,246 @@
+<?php
+
+namespace App\Jobs;
+
+use App\Models\Task;
+use App\Models\User;
+use App\Models\WahaSender;
+use App\Services\WahaService;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+
+class SendTaskWhatsAppJob implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public int $taskId;
+    /** created | status_changed | updated | due_h1 | overdue_h1 */
+    public string $event;
+    public array $meta;
+
+    public function __construct(int $taskId, string $event, array $meta = [])
+    {
+        $this->taskId = $taskId;
+        $this->event  = $event;
+        $this->meta   = $meta;
+    }
+
+    public function handle(): void
+    {
+        /** @var Task|null $task */
+        $task = Task::with(['assignee','creator','owners'])->find($this->taskId);
+        if (!$task) return;
+
+        $sender = $this->resolveSender();
+        if (!$sender) {
+            activity('task_wa')->performedOn($task)->withProperties([
+                'event'  => $this->event,
+                'status' => 'SKIPPED_NO_SENDER',
+            ])->log('Task WA di-skip (tidak ada WA sender aktif).');
+            return;
+        }
+
+        // ===== Preflight seperti di BroadcastController =====
+        try {
+            $svc = app(WahaService::class);
+            $st  = $svc->sessionStatus($sender);
+            $doneStates = ['CONNECTED','READY','WORKING','OPEN','AUTHENTICATED','ONLINE','LOGGED_IN','RUNNING'];
+            $ready = ($st['success'] ?? false) && (
+                ($st['connected'] ?? false) === true ||
+                in_array(strtoupper((string)($st['state'] ?? '')), $doneStates, true)
+            );
+            if (!$ready) {
+                $stateTxt = strtoupper((string)($st['state'] ?? 'UNKNOWN'));
+                activity('task_wa')->performedOn($task)->withProperties([
+                    'event'  => $this->event,
+                    'status' => 'SKIPPED_SESSION_NOT_READY',
+                    'state'  => $stateTxt,
+                ])->log('Task WA di-skip (sesi belum siap).');
+                return;
+            }
+        } catch (\Throwable $e) {
+            activity('task_wa')->performedOn($task)->withProperties([
+                'event'  => $this->event,
+                'status' => 'SKIPPED_SESSION_ERROR',
+                'error'  => $e->getMessage(),
+            ])->log('Task WA di-skip (gagal cek sesi).');
+            return;
+        }
+
+        // Tentukan penerima: assignee, creator, owners(), owner_ids
+        $recipients = $this->resolveRecipients($task);
+        if (empty($recipients)) {
+            activity('task_wa')->performedOn($task)->withProperties([
+                'event'  => $this->event,
+                'status' => 'SKIPPED_NO_RECIPIENT',
+            ])->log('Task WA di-skip (tidak ada penerima).');
+            return;
+        }
+
+        $message = $this->buildMessage($task, $this->event, $this->meta);
+
+        foreach ($recipients as $user) {
+            $number = $this->waSanitize((string)($user->wa_number ?? ''));
+            if (!$number) {
+                activity('task_wa')->performedOn($task)->causedBy($user)->withProperties([
+                    'event'  => $this->event,
+                    'status' => 'SKIPPED_NO_NUMBER',
+                ])->log('Task WA di-skip (user tanpa wa_number).');
+                continue;
+            }
+
+            try {
+                $resp = app(WahaService::class)->sendMessage($sender, $number, $message);
+                $ok   = is_array($resp) ? ($resp['success'] ?? false) : false;
+
+                activity($this->logNameFor($this->event))
+                    ->performedOn($task)
+                    ->causedBy($user)
+                    ->withProperties([
+                        'event'        => $this->event,
+                        'sender_id'    => $sender->id,
+                        'recipient_id' => $user->id,
+                        'number'       => $number,
+                        'status'       => $ok ? 'OK' : 'FAILED',
+                        'http'         => $resp['http'] ?? null,
+                        'path'         => $resp['path'] ?? null,
+                        'message_id'   => $resp['message_id'] ?? null,
+                        'raw'          => $resp['raw'] ?? null,
+                    ])->log($ok ? 'Task WA terkirim' : 'Task WA gagal');
+
+                // Hindari throttling
+                usleep(200 * 1000);
+            } catch (\Throwable $e) {
+                activity($this->logNameFor($this->event))
+                    ->performedOn($task)
+                    ->causedBy($user)
+                    ->withProperties([
+                        'event'        => $this->event,
+                        'sender_id'    => $sender->id,
+                        'recipient_id' => $user->id,
+                        'number'       => $number,
+                        'status'       => 'EXCEPTION',
+                        'error'        => $e->getMessage(),
+                    ])->log('Task WA exception');
+            }
+        }
+    }
+
+    protected function logNameFor(string $event): string
+    {
+        return match ($event) {
+            'created'        => 'task_wa_created',
+            'status_changed' => 'task_wa_status',
+            'updated'        => 'task_wa_updated',
+            'due_h1'         => 'task_wa_due',
+            'overdue_h1'     => 'task_wa_overdue',
+            default          => 'task_wa',
+        };
+    }
+
+    protected function buildMessage(Task $task, string $event, array $meta): string
+    {
+        $title   = trim((string)$task->title);
+        $prio    = strtoupper((string)($task->priority ?? '-'));
+        $due     = optional($task->due_date)->timezone(config('app.timezone'))->format('d M Y H:i');
+        $creator = $task->creator?->name ?: 'System';
+        $url     = route('tasks.index');
+
+        return match ($event) {
+            'created' => "📌 Tugas Baru\n"
+                       . "Judul: {$title}\n"
+                       . "Prioritas: {$prio}\n"
+                       . "Due: ".($due ?: '-')."\n"
+                       . "Dari: {$creator}\n"
+                       . "Link: {$url}",
+
+            'status_changed' => "🔄 Status Tugas Diperbarui\n"
+                       . "Judul: {$title}\n"
+                       . "Status: ".($meta['from'] ?? '-')." → ".($meta['to'] ?? '-')."\n"
+                       . "Prioritas: {$prio}\n"
+                       . "Link: {$url}",
+
+            'updated' => "✏️ Tugas Diperbarui\n"
+                       . "Judul: {$title}\n"
+                       . "Prioritas: {$prio}\n"
+                       . "Due: ".($due ?: '-')."\n"
+                       . "Link: {$url}",
+
+            'due_h1' => "⏰ Pengingat H-1\n"
+                       . "Besok batas waktu tugas: {$title}\n"
+                       . "Prioritas: {$prio}\n"
+                       . "Due: ".($due ?: '-')."\n"
+                       . "Link: {$url}",
+
+            'overdue_h1' => "⚠️ Peringatan Keras (H+1)\n"
+                       . "Tugas melewati deadline: {$title}\n"
+                       . "Prioritas: {$prio}\n"
+                       . "Due: ".($due ?: '-')."\n"
+                       . "Mohon ditindaklanjuti.\n"
+                       . "Link: {$url}",
+
+            default => "Tugas: {$title}\nLink: {$url}",
+        };
+    }
+
+    protected function resolveSender(): ?WahaSender
+    {
+        return WahaSender::query()
+            ->where('is_active', true)
+            ->orderByDesc('is_default')
+            ->orderBy('id')
+            ->first();
+    }
+
+    /**
+     * Penerima = assignee + creator + owners (pivot) + owner_ids (JSON)
+     *
+     * @return User[]
+     */
+    protected function resolveRecipients(Task $task): array
+    {
+        $map = [];
+
+        if ($task->assignee instanceof User) {
+            $map[$task->assignee->id] = $task->assignee;
+        }
+        if ($task->creator instanceof User) {
+            $map[$task->creator->id] = $task->creator;
+        }
+
+        try {
+            if (method_exists($task, 'owners')) {
+                foreach ($task->owners()->get() as $owner) {
+                    if ($owner instanceof User) $map[$owner->id] = $owner;
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        try {
+            if (isset($task->owner_ids)) {
+                $ids = $task->owner_ids;
+                if (is_string($ids)) {
+                    $decoded = json_decode($ids, true);
+                    if (is_array($decoded)) $ids = $decoded;
+                }
+                if (is_array($ids) && !empty($ids)) {
+                    foreach (User::whereIn('id', $ids)->get() as $u) {
+                        $map[$u->id] = $u;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        return array_values($map);
+    }
+
+    protected function waSanitize(?string $p): ?string
+    {
+        if (!$p) return null;
+        $n = preg_replace('/\D+/', '', $p);
+        return $n ?: null;
+    }
+}

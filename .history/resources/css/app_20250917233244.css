@@ -1,0 +1,50 @@
+/* Font Inter variable */
+@import "@fontsource-variable/inter";
+
+/* Tailwind layers */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  /* Item menu default (ikon saja / collapsed) */
+  .sidebar-shell .menu :where(li > a){
+    @apply flex items-center h-11 rounded-xl transition-all duration-200 ease-out;
+    @apply px-3 justify-center gap-0;
+  }
+  .sidebar-shell .menu svg { @apply h-5 w-5; }
+
+  /* Desktop: expand saat hover */
+  @screen lg {
+    .group\/sidebar:hover .menu :where(li > a),
+    .group\/sidebar:focus-within .menu :where(li > a) { @apply px-4 justify-start gap-3; }
+    .group\/sidebar:hover .brand-label,
+    .group\/sidebar:focus-within .brand-label,
+    .group\/sidebar:hover .menu .label,
+    .group\/sidebar:focus-within .menu .label,
+    .group\/sidebar:hover .menu .menu-title,
+    .group\/sidebar:focus-within .menu .menu-title,
+    .group\/sidebar:hover .footer-note,
+    .group\/sidebar:focus-within .footer-note { display: block; }
+  }
+
+  /* ===== MOBILE-OPEN STATE ===== */
+  @media (max-width: 1023.98px) {
+    .sidebar-shell.mobile-open .menu :where(li > a){ @apply px-4 justify-start gap-3; }
+    .sidebar-shell.mobile-open .brand-label,
+    .sidebar-shell.mobile-open .menu .label,
+    .sidebar-shell.mobile-open .menu .menu-title,
+    .sidebar-shell.mobile-open .footer-note { display: block; }
+  }
+
+  /* Kanban drag ghost helper */
+  .kanban-column .sortable-ghost { @apply opacity-70; }
+  .kanban-column .sortable-chosen { @apply rotate-0 scale-[1.01]; }
+}
+
+/* Desktop lebar sidebar (collapsed → expanded) */
+@media (min-width: 1024px) {
+  #app-sidebar { width: 5rem; }
+  #app-sidebar:hover,
+  #app-sidebar:focus-within { width: 16rem; }
+}

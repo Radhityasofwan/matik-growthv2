@@ -1,0 +1,53 @@
+// tailwind.config.js (ESM)
+import defaultTheme from 'tailwindcss/defaultTheme'
+import forms from '@tailwindcss/forms'
+import typography from '@tailwindcss/typography'
+import daisyui from 'daisyui'
+
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    './resources/views/**/*.blade.php',
+    './resources/**/*.{js,ts,vue}',
+    './storage/framework/views/*.php',
+    './vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php',
+  ],
+
+  // >>> Tambahan penting <<<
+  safelist: [
+    // utilitas warna semantik DaisyUI
+    { pattern: /^(bg|text|border|ring)-(primary|secondary|accent|neutral|info|success|warning|error)$/ },
+    // varian base untuk panel/card
+    'bg-base-100','bg-base-200','bg-base-300',
+    // beberapa komponen umum DaisyUI
+    { pattern: /^(btn|btn-(primary|secondary|accent)|badge|badge-(outline|primary|secondary|accent)|alert|alert-(info|success|warning|error))$/ },
+  ],
+
+  theme: {
+    extend: {
+      fontFamily: { sans: ['Inter', ...defaultTheme.fontFamily.sans] },
+    },
+  },
+
+  plugins: [forms, typography, daisyui],
+
+  daisyui: {
+    themes: [
+      {
+        softblue: {
+          primary:   '#3B82F6',
+          secondary: '#ECF4FF',
+          accent:    '#1FB2A6',
+          neutral:   '#1E293B',
+          'base-100':'#ffffff',
+          'base-200':'#F8FAFC',
+          'base-300':'#E2E8F0',
+          info:      '#3ABFF8',
+          success:   '#10B981',
+          warning:   '#F59E0B',
+          error:     '#EF4444',
+        },
+      },
+    ],
+  },
+}
